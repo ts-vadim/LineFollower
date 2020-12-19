@@ -22,7 +22,8 @@ bool ReadUserCommand(String& cmd, bool wait = false);
 void UpdateStateCommands();
 
 void PrintHelp(Command& self);
-void programLog(Command& self);
+
+Command* FindCommand(String name, Command* commands);
 
 
 
@@ -101,6 +102,7 @@ private:
 };
 
 
+
 //	###########  Variables  ###########
 float deltaTime = 1;
 
@@ -108,7 +110,6 @@ Command programCommands[] = {
 	Command(ProgramState::StateNames[0], stopped),
 	Command(ProgramState::StateNames[1], waiting),
 	Command(ProgramState::StateNames[2], running),
-	Command("ProgramLog", "just a \"call anyway\" useless log function", programLog),
 	Command("", nullptr)
 };
 
@@ -128,23 +129,20 @@ Command userCommands[] = {
 			for (int i = 0; i < ProgramState::StatesCount; i++) Log::Println("  " + ProgramState::StateNames[i]);
 		}
 	),
-	Command("togglelog", "toggle useless log function",
-		[](Command&) {
-			programCommands[3].callAnyway = !programCommands[3].callAnyway; programCommands[3].Execute();
-		}
-	),
 	Command("halt", "stop program mainloop", [](Command&) { while (true); }),
 	Command("reset", "reset arduino", [](Command&) { void (*reset)(void) = 0; reset(); }),
 	Command("", nullptr)
 };
 
 
-//	###########  Arduino mains  ###########
+//	######################  Arduino mains  ######################
 void setup()
 {
 	Log::Begin();
 	Log::Println("Program begins");
-	userCommands[0].Execute(); // call PrintHelp()
+
+	Command* cmd = FindCommand("help", userCommands);
+	if (cmd) cmd->Execute();
 
 	long cur_time, prev_time = millis();
 	while (true)
@@ -235,13 +233,13 @@ void PrintHelp(Command& self)
 }
 
 
-void programLog(Command& self)
+Command* FindCommand(String name, Command* commands)
 {
-	Log::Println(self.name + ": delta = " + deltaTime);
+	for (Command* cmd = commands; !cmd->empty; cmd++)
+		if (cmd->name.equals(name))
+			return cmd;
+	return nullptr;
 }
-
-
-
 
 
 
