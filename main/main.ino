@@ -1,7 +1,7 @@
-#include <TroykaLedMatrix.h>
-#include <PID_dragster.h>
-#include <Octoliner.h>
-#include <Dragster.h>
+//#include <TroykaLedMatrix.h>
+//#include <PID_dragster.h>
+//#include <Octoliner.h>
+//#include <Dragster.h>
 #define Matrix TroykaLedMatrix
 
 
@@ -13,6 +13,9 @@ void running();
 void ProcessUserCommand(String cmd);
 bool ReadUserCommand(String& cmd, bool wait = false);
 void UpdateStateCommands();
+
+void PrintHelp();
+
 
 
 //	###########  Classes  ###########
@@ -30,7 +33,7 @@ public:
 		if (Enabled)
 			WriteSerial(msg, false);
 	}
-	static void Println(String msg)
+	static void Println(String msg = "")
 	{
 		if (Enabled)
 			WriteSerial(msg, true);
@@ -39,11 +42,13 @@ public:
 private:
 	static void WriteSerial(String msg, bool newline = true)
 	{
-		if (Serial.availableForWrite() >= msg.length())
+		//if (Serial.availableForWrite() >= msg.length())
+		//{
 			if (newline)
 				Serial.println(msg);
 			else
 				Serial.print(msg);
+		//}
 	}
 };
 static bool Log::Enabled = true;
@@ -68,9 +73,10 @@ static const String ProgramState::StateNames[] = { "STOPPED", "WAITING", "RUNNIN
 struct Command
 {
 	const String name;
+	const String helptext;
 	void (*func)();
-	Command(String _name, void (*_func)()) : name(_name), func(_func)
-		{ Log::Println("Command \'" + name + "\' created."); }
+	Command(String _name, void (*_func)()) : name(_name), func(_func), helptext("") {}
+	Command(String _name, String _help, void (*_func)()) : name(_name), func(_func), helptext(_help) {}
 };
 
 
@@ -83,10 +89,10 @@ Command programCommands[] = {
 };
 
 Command userCommands[] = {
-	Command("help", []() { Log::Println("Help!"); }),
-	Command("stop", []() { Log::Println("Stop!"); }),
-	Command("wait", []() { Log::Println("Wait!"); }),
-	Command("run", []() { Log::Println("Run!"); }),
+	Command("help", "prints this help message", PrintHelp),
+	Command("stop", "sets state to STOP", []() { ProgramState::SetState(ProgramState::STOPPED); }),
+	Command("wait", "sets state to WAIT", []() { ProgramState::SetState(ProgramState::WAITING); }),
+	Command("run", "sets state to RUN", []() { ProgramState::SetState(ProgramState::RUNNING); }),
 	Command("", nullptr)
 };
 
@@ -104,10 +110,8 @@ void loop()
 	while (true)
 	{
 		String userCmd;
-		if (ReadUserCommand(userCmd, true))
-			Serial.println("Command: " + userCmd);
-
-		ProcessUserCommand(userCmd);
+		if (ReadUserCommand(userCmd))
+			ProcessUserCommand(userCmd);
 		UpdateStateCommands();
 	}
 }
@@ -128,22 +132,20 @@ void ProcessUserCommand(String cmd)
 			command->func();
 			return;
 		}
+		command++;
 	}
 	Log::Println("Undefined command \"" + cmd + "\"");
 }
 
 bool ReadUserCommand(String& cmd, bool wait)
 {
-	cmd = "";
-    if (wait)
-      while (Serial.available() <= 0);
-    while (Serial.available() > 0)
-    {
-      char c = Serial.read();
-      if (c == '\n')
-        return true;
-      cmd += c;
-    }
+	if (wait)
+		while (Serial.available() <= 0);
+	if (Serial.available() > 0)
+	{
+		cmd = Serial.readStringUntil('\n');
+		return true;
+	}
 	return false;
 }
 
@@ -159,12 +161,18 @@ void UpdateStateCommands()
 			command->func();
 			return;
 		}
+		command++;
 	}
 	Log::Println("Undefined state name/command \"" + stateName + "\"");
 }
 
 
-
+void PrintHelp()
+{
+	Log::Println("Help:");
+	for (int i = 0; userCommands[i].func; i++)
+		Serial.println("  " + userCommands[i].name + " - " + userCommands[i].helptext);
+}
 
 
 
