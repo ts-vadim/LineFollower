@@ -1,15 +1,12 @@
-//#include <TroykaLedMatrix.h>
-//#include <PID_dragster.h>
-//#include <Octoliner.h>
-//#include <Dragster.h>
-//#define Matrix TroykaLedMatrix
+#include "Log.h"
+#include "ProgramState.h"
+#include "Command.h"
 
 
 
-
-class Log;
-class ProgramState;
-class Command;
+//  ###########  Global Variables  ###########
+static const int morotPins[2] = { 5, 6 };
+static const int sensorPins[2] = { 3, 4 };
 
 
 //	###########  Functions  ###########
@@ -17,103 +14,18 @@ void stopped(Command&);
 void waiting(Command&);
 void running(Command&);
 
-void ProcessUserCommand(String cmd);
-bool ReadUserCommand(String& cmd, bool wait = false);
-void UpdateStateCommands();
+void PrintHelp(Command&);
+void drive(int left, int right);
 
-void PrintHelp(Command& self);
+extern void ProcessUserCommand(String cmd, Command* cmds);
+extern bool ReadUserCommand(String& cmd, bool wait = false);
+extern void UpdateStateCommands(const String& stateName, Command* cmds);
 
-Command* FindCommand(String name, Command* commands);
-
-
-
-//	###########  Classes  ###########
-//	----- Log
-class Log
-{
-public:
-	static bool Enabled;
-
-	static void Begin() { Serial.begin(9600); }
-	static void End() { Serial.end(); }
-
-	static void Print(String msg)
-	{
-		if (Enabled)
-			WriteSerial(msg, false);
-	}
-	static void Println(String msg = "")
-	{
-		if (Enabled)
-			WriteSerial(msg, true);
-	}
-
-private:
-	static void WriteSerial(String msg, bool newline = true)
-	{
-		//if (Serial.availableForWrite() >= msg.length())
-		//{
-			if (newline)
-				Serial.println(msg);
-			else
-				Serial.print(msg);
-		//}
-	}
-};
-static bool Log::Enabled = true;
-
-//	----- ProgramState
-class ProgramState
-{
-public:
-	enum State { STOPPED, WAITING, RUNNING };
-	static const int StatesCount = 3;
-	static const String StateNames[StatesCount];
-
-	static State GetState() { return m_State; }
-	static void SetState(State state) { m_State = state; Log::Println("State: " + StateNames[m_State]); }
-
-private:
-	static State m_State;
-};
-static ProgramState::State ProgramState::m_State = ProgramState::WAITING;
-static const String ProgramState::StateNames[] = { "STOPPED", "WAITING", "RUNNING" };
-
-//	----- Command
-class Command
-{
-public:
-	const bool empty; 
-	const String name;
-	const String helptext;
-	bool callAnyway = false;
-	
-	Command(String _name, void (*_func)(Command& self))
-		: name(_name), func(_func), helptext(""), empty((_func) ? false : true) {}
-	Command(String _name, String _help, void (*_func)(Command& self))
-		: name(_name), helptext(_help), func(_func), empty((_func) ? false : true) {}
-	Command(String _name, String _help, bool _callAnyway, void (*_func)(Command& self))
-		: name(_name), helptext(_help), callAnyway(_callAnyway), func(_func), empty((_func) ? false : true) {}
-
-	void Execute() { func(*this); }
-
-private:
-	const void (*func)(Command& self);
-};
+extern Command* FindCommand(String name, Command* commands);
 
 
-
-//	###########  Variables  ###########
-float deltaTime = 1;
-
-Command programCommands[] = {
-	Command(ProgramState::StateNames[0], stopped),
-	Command(ProgramState::StateNames[1], waiting),
-	Command(ProgramState::StateNames[2], running),
-	Command("", nullptr)
-};
-
-Command userCommands[] = {
+//	###########  Commands  ###########
+static Command userCommands[] = {
 	Command("help", "prints this help message", PrintHelp),
 	Command("stop", "sets state to STOP", [](Command&) { ProgramState::SetState(ProgramState::STOPPED); }),
 	Command("wait", "sets state to WAIT", [](Command&) { ProgramState::SetState(ProgramState::WAITING); }),
@@ -134,6 +46,13 @@ Command userCommands[] = {
 	Command("", nullptr)
 };
 
+static Command programCommands[] = {
+	Command(ProgramState::StateNames[0], stopped),
+	Command(ProgramState::StateNames[1], waiting),
+	Command(ProgramState::StateNames[2], running),
+	Command("", nullptr)
+};
+
 
 //	######################  Arduino mains  ######################
 void setup()
@@ -145,6 +64,7 @@ void setup()
 	if (cmd) cmd->Execute();
 
 	long cur_time, prev_time = millis();
+	float deltaTime = 1;
 	while (true)
 	{
 		prev_time = cur_time;
@@ -152,8 +72,8 @@ void setup()
 
 		String userCmd;
 		if (ReadUserCommand(userCmd))
-			ProcessUserCommand(userCmd);
-		UpdateStateCommands();
+			ProcessUserCommand(userCmd, userCommands);
+		UpdateStateCommands(ProgramState::StateNames[ProgramState::GetState()], programCommands);
 
 		deltaTime = (cur_time - prev_time) / 1000.0;
 	}
@@ -166,56 +86,29 @@ void loop()
 
 //	###########  Function's Implementations  ###########
 void stopped(Command&) {}
-void waiting(Command&) {}
 void running(Command&) {}
-
-void ProcessUserCommand(String cmd)
+void waiting(Command&)
 {
-	bool typedFunctionCalled = false;
-	Command *command = &userCommands[0];
-	while (!command->empty)
-	{
-		if (cmd.equals(command->name))
-		{
-			command->Execute();
-			typedFunctionCalled = true;
-		}
-		else if (command->callAnyway)
-		{
-			command->Execute();
-		}
-		command++;
-	}
-	if (!typedFunctionCalled)
-		Log::Println("Undefined command \"" + cmd + "\"");
+	int sensors[2];
+
+	sensors[0] = digitalRead(sensorPins[0]);
+	sensors[1] = digitalRead(sensorPins[1]);
+
+	drive((sensors[0] - sensors[1]) * 256.0, (sensors[1] - sensors[0]) * 256.0);
+
+	Log::Println("Run");
 }
 
-bool ReadUserCommand(String& cmd, bool wait)
+void drive(int left, int right)
 {
-	if (wait)
-		while (Serial.available() <= 0);
-	if (Serial.available() > 0)
-	{
-		cmd = Serial.readStringUntil('\n');
-		if (cmd != "")
-			return true;
-	}
-	return false;
+	analogWrite(morotPins[0], left);
+	analogWrite(morotPins[1], right);
+
+	Log::Print("Drive: ");
+	Log::Print(String(left));
+	Log::Print(" ");
+	Log::Println(String(right));
 }
-
-
-void UpdateStateCommands()
-{
-	const String& stateName = ProgramState::StateNames[ProgramState::GetState()];
-	Command *command = &programCommands[0];
-	while (!command->empty)
-	{
-		if (stateName.equals(command->name) || command->callAnyway)
-			command->Execute();
-		command++;
-	}
-}
-
 
 void PrintHelp(Command& self)
 {
@@ -230,15 +123,6 @@ void PrintHelp(Command& self)
 		Log::Println(command->helptext);
 		command++;
 	}
-}
-
-
-Command* FindCommand(String name, Command* commands)
-{
-	for (Command* cmd = commands; !cmd->empty; cmd++)
-		if (cmd->name.equals(name))
-			return cmd;
-	return nullptr;
 }
 
 
