@@ -2,4 +2,4 @@
 
 
 ProgramState::State ProgramState::m_State = ProgramState::WAITING;
-const String ProgramState::StateNames[] = { "STOPPED", "WAITING", "RUNNING" };
+const char* ProgramState::StateNames[] = { "STOPPED", "WAITING", "RUNNING" };

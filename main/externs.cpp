@@ -4,16 +4,17 @@
 #include "Log.h"
 
 
-void ProcessUserCommand(String cmd, Command* cmds)
+void ProcessUserCommand(const char* cmdName, Command* cmds)
 {
 	bool typedFunctionCalled = false;
 	Command *command = cmds;
 	while (!command->empty)
 	{
-		if (cmd.equals(command->name))
+		if (strcmp(command->name, cmdName) == 0)
 		{
 			command->Execute();
 			typedFunctionCalled = true;
+			break;
 		}
 		else if (command->callAnyway)
 		{
@@ -22,42 +23,45 @@ void ProcessUserCommand(String cmd, Command* cmds)
 		command++;
 	}
 	if (!typedFunctionCalled)
-		Log::Println("Undefined command \"" + cmd + "\"");
+	{
+		Log::Print("Undefined command \"");
+		Log::Print(cmdName);
+		Log::Println("\"");
+	}
 }
 
-bool ReadUserCommand(String& cmd, bool wait)
+bool ReadUserCommand(char* cmd, bool wait)
 {
 	if (wait)
 		while (Serial.available() <= 0);
 	if (Serial.available() > 0)
 	{
-		cmd = Serial.readStringUntil('\n');
-		if (cmd != "")
+		String inp = Serial.readStringUntil('\n');
+		if (inp != "")
+		{
+			strcpy(cmd, inp.c_str());
 			return true;
+		}
 	}
 	return false;
 }
 
 
-void UpdateStateCommands(const String& stateName, Command* cmds)
+void UpdateStateCommands(const char* stateName, Command* cmds)
 {
 	Command *command = cmds;
 	while (!command->empty)
 	{
-		if (stateName == command->name || command->callAnyway)
-		{
-			Log::Println("Executing " + command->name);
-			command->Execute();
-		}
-			
+		if (strcmp(stateName, command->name) == 0 || command->callAnyway)
+			command->Execute();	
 		command++;
 	}
 }
 
-Command* FindCommand(String name, Command* commands)
+Command* FindCommand(const char* name, Command* commands)
 {
 	for (Command* cmd = commands; !cmd->empty; cmd++)
-		if (cmd->name.equals(name))
+		if (strcmp(name, cmd->name) == 0)
 			return cmd;
 	return nullptr;
 }

@@ -4,24 +4,19 @@
 
 
 
-//  ###########  Global Variables  ###########
-static const int morotPins[2] = { 5, 6 };
-static const int sensorPins[2] = { 3, 4 };
-
-
 //	###########  Functions  ###########
 void stopped(Command&);
 void waiting(Command&);
 void running(Command&);
 
 void PrintHelp(Command&);
-void drive(int left, int right);
 
-extern void ProcessUserCommand(String cmd, Command* cmds);
-extern bool ReadUserCommand(String& cmd, bool wait = false);
-extern void UpdateStateCommands(const String& stateName, Command* cmds);
 
-extern Command* FindCommand(String name, Command* commands);
+//	###########  Externs  ###########
+extern void ProcessUserCommand(const char* cmd, Command* cmds);
+extern bool ReadUserCommand(char* cmd, bool wait = false);
+extern void UpdateStateCommands(const char* stateName, Command* cmds);
+extern Command* FindCommand(const char* name, Command* commands);
 
 
 //	###########  Commands  ###########
@@ -32,24 +27,29 @@ static Command userCommands[] = {
 	Command("run", "sets state to RUN", [](Command&) { ProgramState::SetState(ProgramState::RUNNING); }),
 	Command("state", "prints current state",
 		[](Command&) {
-			Log::Println("Current state: " + ProgramState::StateNames[ProgramState::GetState()]); 
+			Log::Print("Current state: ");
+			Log::Println(ProgramState::StateNames[ProgramState::GetState()]); 
 		}
 	),
 	Command("states", "prints all states",
 		[](Command&) {
 			Log::Println("Known states:");
-			for (int i = 0; i < ProgramState::StatesCount; i++) Log::Println("  " + ProgramState::StateNames[i]);
+			for (int i = 0; i < ProgramState::StatesCount; i++)
+			{
+				Log::Print("  ");
+				Log::Println(ProgramState::StateNames[i]);
+			}
 		}
 	),
-	Command("halt", "stop program mainloop", [](Command&) { while (true); }),
+	//Command("halt", "stop program mainloop", [](Command&) { while (true); }),
 	Command("reset", "reset arduino", [](Command&) { void (*reset)(void) = 0; reset(); }),
 	Command("", nullptr)
 };
 
 static Command programCommands[] = {
-	Command(ProgramState::StateNames[0], stopped),
-	Command(ProgramState::StateNames[1], waiting),
-	Command(ProgramState::StateNames[2], running),
+	Command(ProgramState::StateNames[0], "stopped", stopped),
+	Command(ProgramState::StateNames[1], "waiting", waiting),
+	Command(ProgramState::StateNames[2], "running", running),
 	Command("", nullptr)
 };
 
@@ -60,22 +60,14 @@ void setup()
 	Log::Begin();
 	Log::Println("Program begins");
 
-	Command* cmd = FindCommand("help", userCommands);
-	if (cmd) cmd->Execute();
+	FindCommand("help", userCommands)->Execute();
 
-	long cur_time, prev_time = millis();
-	float deltaTime = 1;
+	char userCmd[20];
 	while (true)
 	{
-		prev_time = cur_time;
-		cur_time = millis();
-
-		String userCmd;
 		if (ReadUserCommand(userCmd))
 			ProcessUserCommand(userCmd, userCommands);
 		UpdateStateCommands(ProgramState::StateNames[ProgramState::GetState()], programCommands);
-
-		deltaTime = (cur_time - prev_time) / 1000.0;
 	}
 }
 
@@ -85,42 +77,45 @@ void loop()
 
 
 //	###########  Function's Implementations  ###########
-void stopped(Command&) { Log::Println("Stopped"); }
-void running(Command&) {}
-void waiting(Command&)
+void stopped(Command&) {}
+void waiting(Command&) {}
+void running(Command&)
 {
-	int sensors[2];
+	static bool ledState = false;
+	static const float cooldown = 0.1;
+	static int prev = 0;
 
-	sensors[0] = digitalRead(sensorPins[0]);
-	sensors[1] = digitalRead(sensorPins[1]);
+	int current = millis();
 
-	drive((sensors[0] - sensors[1]) * 256.0, (sensors[1] - sensors[0]) * 256.0);
-
-	Log::Println("Run");
+	if ((current - prev) / 1000.0 >= cooldown)
+	{
+		prev = current;
+		digitalWrite(2, ledState);
+		ledState = !ledState;
+	}
 }
 
-void drive(int left, int right)
-{
-	analogWrite(morotPins[0], left);
-	analogWrite(morotPins[1], right);
 
-	Log::Print("Drive: ");
-	Log::Print(String(left));
-	Log::Print(" ");
-	Log::Println(String(right));
-}
-
-void PrintHelp(Command& self)
+void PrintHelp(Command&)
 {
-	Log::Println("Help:");
 	Command *command = userCommands;
+
+	Log::Println("User commands:");
 	while (!command->empty)
 	{
 		Log::Print("  ");
 		Log::Print(command->name);
-		Log::Print((command->empty) ? "(empty)" : "");
 		Log::Print(" - ");
 		Log::Println(command->helptext);
+		command++;
+	}
+
+	command = programCommands;
+	Log::Println("State commands:");
+	while (!command->empty)
+	{
+		Log::Print("  ");
+		Log::Println(command->name);
 		command++;
 	}
 }
