@@ -2,6 +2,7 @@
 #include "Command.h"
 #include "ProgramState.h"
 #include "Log.h"
+#include "strcpy_s.h"
 
 
 void ProcessUserCommand(const char* cmdName, Command* cmds)
@@ -30,16 +31,18 @@ void ProcessUserCommand(const char* cmdName, Command* cmds)
 	}
 }
 
-bool ReadUserCommand(char* cmd, bool wait)
+bool ReadUserCommand(char* cmd, int cmdlen, bool wait)
 {
 	if (wait)
 		while (Serial.available() <= 0);
+	if (cmd == nullptr)
+		return true;
 	if (Serial.available() > 0)
 	{
 		String inp = Serial.readStringUntil('\n');
 		if (inp != "")
 		{
-			strcpy(cmd, inp.c_str());
+			strcpy_s(cmd, cmdlen, inp.c_str());
 			return true;
 		}
 	}

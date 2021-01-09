@@ -14,7 +14,7 @@ void PrintHelp(Command&);
 
 //	###########  Externs  ###########
 extern void ProcessUserCommand(const char* cmd, Command* cmds);
-extern bool ReadUserCommand(char* cmd, bool wait = false);
+extern bool ReadUserCommand(char* cmd, int cmdlen, bool wait = false);
 extern void UpdateStateCommands(const char* stateName, Command* cmds);
 extern Command* FindCommand(const char* name, Command* commands);
 
@@ -41,8 +41,8 @@ static Command userCommands[] = {
 			}
 		}
 	),
-	//Command("halt", "stop program mainloop", [](Command&) { while (true); }),
-	Command("reset", "reset arduino", [](Command&) { void (*reset)(void) = 0; reset(); }),
+	Command("halt", "stops program and waits for user input", [](Command&) { ReadUserCommand(nullptr, 0, true); }),
+	Command("reset", "resets arduino", [](Command&) { void (*reset)(void) = 0; reset(); }),
 	Command("", nullptr)
 };
 
@@ -62,10 +62,10 @@ void setup()
 
 	FindCommand("help", userCommands)->Execute();
 
-	char userCmd[20];
+	char userCmd[10];
 	while (true)
 	{
-		if (ReadUserCommand(userCmd))
+		if (ReadUserCommand(userCmd, 10))
 			ProcessUserCommand(userCmd, userCommands);
 		UpdateStateCommands(ProgramState::StateNames[ProgramState::GetState()], programCommands);
 	}
@@ -118,6 +118,9 @@ void PrintHelp(Command&)
 		Log::Println(command->name);
 		command++;
 	}
+
+	Log::Print("Current state: ");
+	Log::Println(ProgramState::StateNames[ProgramState::GetState()]);
 }
 
 
