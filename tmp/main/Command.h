@@ -8,17 +8,17 @@ class Command
 {
 public:
 	const bool empty;
-	const String name;
-	const String helptext;
+	const char* const name;
+	const char* const helptext;
 	bool callAnyway = false;
 	
-	Command(String _name, void (*_func)(Command& self))
+	Command(const char* _name, void (*_func)(Command& self))
 		: name(_name), func(_func), helptext(""), empty((_func) ? false : true) {}
 
-	Command(String _name, const String& _help, void (*_func)(Command& self))
+	Command(const char* _name, const char* _help, void (*_func)(Command& self))
 		: name(_name), helptext(_help), func(_func), empty((_func) ? false : true) {}
 
-	Command(String _name, const String& _help, bool _callAnyway, const void (*_func)(Command& self))
+	Command(const char* _name, const char* _help, bool _callAnyway, const void (*_func)(Command& self))
 		: name(_name), helptext(_help), callAnyway(_callAnyway), func(_func), empty((_func) ? false : true) {}
 
 	void Execute() { func(*this); }

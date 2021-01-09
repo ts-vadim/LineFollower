@@ -13,10 +13,10 @@ void PrintHelp(Command&);
 
 
 //	###########  Externs  ###########
-extern void ProcessUserCommand(const String& cmd, Command* cmds);
-extern bool ReadUserCommand(String& cmd, bool wait = false);
-extern void UpdateStateCommands(const String& stateName, Command* cmds);
-extern Command* FindCommand(const String& name, Command* commands);
+extern void ProcessUserCommand(const char* cmd, Command* cmds);
+extern bool ReadUserCommand(char* cmd, bool wait = false);
+extern void UpdateStateCommands(const char* stateName, Command* cmds);
+extern Command* FindCommand(const char* name, Command* commands);
 
 
 //	###########  Commands  ###########
@@ -62,19 +62,12 @@ void setup()
 
 	FindCommand("help", userCommands)->Execute();
 
-	long cur_time, prev_time = millis();
-	float deltaTime = 1;
+	char userCmd[20];
 	while (true)
 	{
-		prev_time = cur_time;
-		cur_time = millis();
-
-		String userCmd;
 		if (ReadUserCommand(userCmd))
 			ProcessUserCommand(userCmd, userCommands);
 		UpdateStateCommands(ProgramState::StateNames[ProgramState::GetState()], programCommands);
-
-		deltaTime = (cur_time - prev_time) / 1000.0;
 	}
 }
 
@@ -84,8 +77,8 @@ void loop()
 
 
 //	###########  Function's Implementations  ###########
-void stopped(Command&) { Log::Println("stopped");}
-void waiting(Command&) { Log::Println("waiting"); }
+void stopped(Command&) {}
+void waiting(Command&) {}
 void running(Command&)
 {
 	static bool ledState = false;
@@ -99,7 +92,6 @@ void running(Command&)
 		prev = current;
 		digitalWrite(2, ledState);
 		ledState = !ledState;
-		Log::Println("Led switched");
 	}
 }
 
@@ -113,7 +105,6 @@ void PrintHelp(Command&)
 	{
 		Log::Print("  ");
 		Log::Print(command->name);
-		Log::Print((command->empty) ? "(empty)" : "");
 		Log::Print(" - ");
 		Log::Println(command->helptext);
 		command++;
@@ -124,11 +115,7 @@ void PrintHelp(Command&)
 	while (!command->empty)
 	{
 		Log::Print("  ");
-		Log::Print(command->name);
-		Log::Print(" length: ");
-		Log::Print(String(command->name.length()));
-		Log::Print(" func: ");
-		Log::Println(String(command->empty));
+		Log::Println(command->name);
 		command++;
 	}
 }
