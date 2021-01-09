@@ -1,3 +1,9 @@
+
+#include <Arduino.h>
+
+#include "Dragster.h"
+typedef TroykaLedMatrix Matrix;
+
 #include "Log.h"
 #include "ProgramState.h"
 #include "Command.h"
@@ -53,7 +59,9 @@ static Command programCommands[] = {
 };
 
 
-//	######################  Arduino mains  ######################
+//	##############################################################
+//	##################      Arduino mains      ###################
+//	##############################################################
 void setup()
 {
 	Log::Begin();
@@ -70,9 +78,7 @@ void setup()
 	}
 }
 
-void loop()
-{
-}
+void loop() {}
 
 
 //	###########  Function's Implementations  ###########
