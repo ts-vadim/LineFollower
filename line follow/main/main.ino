@@ -33,7 +33,7 @@ static Command userCommands[] = {
 	Command("state", "prints current state",
 		[](Command&) {
 			Log::Print("Current state: ");
-			Log::Println(ProgramState::StateNames[ProgramState::GetState()]); 
+			Log::Println(ProgramState::StateNames[ProgramState::GetState()]);
 		}
 	),
 	Command("states", "prints all states",
@@ -48,6 +48,7 @@ static Command userCommands[] = {
 	),
 	Command("halt", "stops program and waits for user input", [](Command&) { ReadUserCommand(nullptr, 0, true); }),
 	Command("reset", "resets arduino", [](Command&) { void (*reset)(void) = 0; reset(); }),
+  Command("battery", "prints battery charge", [](Command&) { Log::Print("Battery charge: "); Log::Print(String(Dragster::GetBatteryCharge() * 100)); Log::Println("%"); }),
 	Command("", nullptr)
 };
 
