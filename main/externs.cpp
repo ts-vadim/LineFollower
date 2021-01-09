@@ -42,7 +42,12 @@ bool ReadUserCommand(char* cmd, int cmdlen, bool wait)
 		String inp = Serial.readStringUntil('\n');
 		if (inp != "")
 		{
-			strcpy_s(cmd, cmdlen, inp.c_str());
+			int err = strcpy_s(cmd, cmdlen, inp.c_str());
+			if (err == ERROR_SLIMITEXCEEDED)
+			{
+				Log::Print("Maximum input string length is ");
+				Log::Println(String(cmdlen - 1));
+			}
 			return true;
 		}
 	}
