@@ -3,7 +3,6 @@
 #include "Command.h"
 
 
-
 //	###########  Functions  ###########
 void stopped(Command&);
 void waiting(Command&);
@@ -62,10 +61,10 @@ void setup()
 
 	FindCommand("help", userCommands)->Execute();
 
-	char userCmd[10];
+	char userCmd[11];
 	while (true)
 	{
-		if (ReadUserCommand(userCmd, 10))
+		if (ReadUserCommand(userCmd, 11))
 			ProcessUserCommand(userCmd, userCommands);
 		UpdateStateCommands(ProgramState::StateNames[ProgramState::GetState()], programCommands);
 	}

@@ -33,7 +33,6 @@ int strcpy_s(char* dest, int dmax, const char* src)
             *dest = '\0';
             return ERROR_SLIMITEXCEEDED;
         }
-
     }
     *dest = '\0';
     return 0;

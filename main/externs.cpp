@@ -7,14 +7,14 @@
 
 void ProcessUserCommand(const char* cmdName, Command* cmds)
 {
-	bool typedFunctionCalled = false;
+	bool givenFunctionWasCalled = false;
 	Command *command = cmds;
 	while (!command->empty)
 	{
 		if (strcmp(command->name, cmdName) == 0)
 		{
 			command->Execute();
-			typedFunctionCalled = true;
+			givenFunctionWasCalled = true;
 			break;
 		}
 		else if (command->callAnyway)
@@ -23,7 +23,7 @@ void ProcessUserCommand(const char* cmdName, Command* cmds)
 		}
 		command++;
 	}
-	if (!typedFunctionCalled)
+	if (!givenFunctionWasCalled)
 	{
 		Log::Print("Undefined command \"");
 		Log::Print(cmdName);
@@ -31,12 +31,15 @@ void ProcessUserCommand(const char* cmdName, Command* cmds)
 	}
 }
 
+
 bool ReadUserCommand(char* cmd, int cmdlen, bool wait)
 {
 	if (wait)
 		while (Serial.available() <= 0);
+	
 	if (cmd == nullptr)
 		return true;
+	
 	if (Serial.available() > 0)
 	{
 		String inp = Serial.readStringUntil('\n');
@@ -65,6 +68,7 @@ void UpdateStateCommands(const char* stateName, Command* cmds)
 		command++;
 	}
 }
+
 
 Command* FindCommand(const char* name, Command* commands)
 {

@@ -1,6 +1,6 @@
 #include "Log.h"
 
-bool Log::Enabled = true;
+bool Log::m_Enabled = true;
 
 
 void Log::Begin()
@@ -15,14 +15,24 @@ void Log::End()
 
 void Log::Print(String msg)
 {
-	if (Enabled)
+	if (m_Enabled)
 		WriteSerial(msg, false);
 }
 
 void Log::Println(String msg = "")
 {
-	if (Enabled)
+	if (m_Enabled)
 		WriteSerial(msg, true);
+}
+
+void Log::SetEnabled(bool enabled)
+{
+	m_Enabled = enabled;
+}
+
+bool Log::IsEnabled()
+{
+	return m_Enabled;
 }
 
 void Log::WriteSerial(String msg, bool newline = true)

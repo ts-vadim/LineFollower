@@ -7,15 +7,18 @@
 class Log
 {
 public:
-	static bool Enabled;
-
 	static void Begin();
 	static void End();
 
 	static void Print(String msg);
 	static void Println(String msg = "");
 
+	static void SetEnabled(bool enabled);
+	static bool IsEnabled();
+
 private:
+	static bool m_Enabled;
+
 	static void WriteSerial(String msg, bool newline = true);
 };
 
