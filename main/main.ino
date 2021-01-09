@@ -85,7 +85,7 @@ void loop()
 
 
 //	###########  Function's Implementations  ###########
-void stopped(Command&) {}
+void stopped(Command&) { Log::Println("Stopped"); }
 void running(Command&) {}
 void waiting(Command&)
 {

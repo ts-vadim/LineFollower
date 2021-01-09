@@ -4,16 +4,17 @@
 #include "Log.h"
 
 
-void ProcessUserCommand(String cmd, Command* cmds)
+void ProcessUserCommand(const String& cmdName, Command* cmds)
 {
 	bool typedFunctionCalled = false;
 	Command *command = cmds;
 	while (!command->empty)
 	{
-		if (cmd.equals(command->name))
+		if (cmdName == command->name)
 		{
 			command->Execute();
 			typedFunctionCalled = true;
+			break;
 		}
 		else if (command->callAnyway)
 		{
@@ -22,7 +23,11 @@ void ProcessUserCommand(String cmd, Command* cmds)
 		command++;
 	}
 	if (!typedFunctionCalled)
-		Log::Println("Undefined command \"" + cmd + "\"");
+	{
+		Log::Print("Undefined command \"");
+		Log::Print(cmdName);
+		Log::Println("\"");
+	}
 }
 
 bool ReadUserCommand(String& cmd, bool wait)
@@ -45,19 +50,15 @@ void UpdateStateCommands(const String& stateName, Command* cmds)
 	while (!command->empty)
 	{
 		if (stateName == command->name || command->callAnyway)
-		{
-			Log::Println("Executing " + command->name);
-			command->Execute();
-		}
-			
+			command->Execute();	
 		command++;
 	}
 }
 
-Command* FindCommand(String name, Command* commands)
+Command* FindCommand(const String& name, Command* commands)
 {
 	for (Command* cmd = commands; !cmd->empty; cmd++)
-		if (cmd->name.equals(name))
+		if (name == cmd->name)
 			return cmd;
 	return nullptr;
 }
