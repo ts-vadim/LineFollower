@@ -1,25 +1,43 @@
 
 #include <Arduino.h>
 
-#include "Dragster.h"
+#include <PID_dragster.h>
+#include <Dragster.h>
+#include <Octoliner.h>
+#include <TroykaLedMatrix.h>
 typedef TroykaLedMatrix Matrix;
 
 #include "Log.h"
 #include "ProgramState.h"
 #include "Command.h"
+#include "DragsterUtils.h"
+
+
+//  ###########  Globals  ###########
+float dragsterSpeed = 0.7;
+float KP = 0.6;
+float KD = 0.02;
+float KI = 0.0;
+
+TroykaLedMatrix matrix;
+Dragster robot;
+Octoliner octoliner;
+PID pid(KP, KI, KD);
+
 
 
 //	###########  Functions  ###########
 void stopped(Command&);
 void waiting(Command&);
 void running(Command&);
+void running2(Command&);
 
 void PrintHelp(Command&);
 
 
 //	###########  Externs  ###########
 extern void ProcessUserCommand(const char* cmd, Command* cmds);
-extern bool ReadUserCommand(char* cmd, int cmdlen, bool wait = false);
+extern bool ReadUserInput(char* cmd, int cmdlen);
 extern void UpdateStateCommands(const char* stateName, Command* cmds);
 extern Command* FindCommand(const char* name, Command* commands);
 
@@ -46,9 +64,9 @@ static Command userCommands[] = {
 			}
 		}
 	),
-	Command("halt", "stops program and waits for user input", [](Command&) { ReadUserCommand(nullptr, 0, true); }),
+	Command("halt", "stops program and waits for user input", [](Command&) { while (!ReadUserInput(nullptr, 0)); }),
 	Command("reset", "resets arduino", [](Command&) { void (*reset)(void) = 0; reset(); }),
-  Command("battery", "prints battery charge", [](Command&) { Log::Print("Battery charge: "); Log::Print(String(Dragster::GetBatteryCharge() * 100)); Log::Println("%"); }),
+	Command("battery", "prints battery charge", [](Command&) { Log::Print("Battery charge: "); Log::Print(String(GetBatteryCharge() * 100)); Log::Println("%"); }),
 	Command("", nullptr)
 };
 
@@ -65,6 +83,10 @@ static Command programCommands[] = {
 //	##############################################################
 void setup()
 {
+	robot.begin();
+	octoliner.begin(200);
+	matrix.begin();
+
 	Log::Begin();
 	Log::Println("Program begins");
 
@@ -73,7 +95,7 @@ void setup()
 	char userCmd[11];
 	while (true)
 	{
-		if (ReadUserCommand(userCmd, 11))
+		if (ReadUserInput(userCmd, 11))
 			ProcessUserCommand(userCmd, userCommands);
 		UpdateStateCommands(ProgramState::StateNames[ProgramState::GetState()], programCommands);
 	}
@@ -84,8 +106,8 @@ void loop() {}
 
 //	###########  Function's Implementations  ###########
 void stopped(Command&) {}
-void waiting(Command&) {}
-void running(Command&)
+
+void waiting(Command&)
 {
 	static bool ledState = false;
 	static const float cooldown = 0.1;
@@ -99,6 +121,52 @@ void running(Command&)
 		digitalWrite(2, ledState);
 		ledState = !ledState;
 	}
+}
+
+void running(Command&)
+{
+	static byte diagram[8] = {0};
+	static int lineData[8] = {0};
+	static int threshold = 2000;
+	static float error = 0;
+
+	for (int i = 0; i < 8; i++) {
+		lineData[i] = octoliner.analogRead(i);
+		diagram[i] = matrix.map(lineData[i], 0, 4095);
+	}
+
+	error = octoliner.mapLine(lineData);
+	double output = pid.compute(error);
+	robot.driveF(dragsterSpeed - output, dragsterSpeed + output);
+
+	matrix.drawBitmap(diagram);
+	matrix.update();
+}
+
+
+void running2(Command&)
+{
+	static float error = 0;
+	static float sum = 0;
+	static float sumWeighted = 0;
+	static float Kp = 0.5;
+	static byte diagram[8] = {0};
+	static float weight[] =
+		{ -1, -0.75, -0.5, -0.25, 0.25, 0.5, 0.75, 1};
+
+
+	for (int i = 0; i < 8; i++) {
+		int adcValue = octoliner.analogRead(i);
+		diagram[i] = matrix.map(adcValue, 0, 4095);
+		sum += adcValue;
+		sumWeighted += adcValue * weight[i];
+		}
+	if (sum != 0.0) {
+		error = sumWeighted / sum;
+	}
+	matrix.drawBitmap(diagram);
+
+	robot.driveF(0.35 - error * Kp, 0.35 + error * Kp);
 }
 
 
@@ -128,9 +196,6 @@ void PrintHelp(Command&)
 	Log::Print("Current state: ");
 	Log::Println(ProgramState::StateNames[ProgramState::GetState()]);
 }
-
-
-
 
 
 

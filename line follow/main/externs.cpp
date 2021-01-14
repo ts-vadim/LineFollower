@@ -32,16 +32,13 @@ void ProcessUserCommand(const char* cmdName, Command* cmds)
 }
 
 
-bool ReadUserCommand(char* cmd, int cmdlen, bool wait)
+bool ReadUserInput(char* cmd, int cmdlen)
 {
-	if (wait)
-		while (Serial.available() <= 0);
-	
-	if (cmd == nullptr)
-		return true;
-	
 	if (Serial.available() > 0)
 	{
+		if (cmdlen <= 0)
+			return true;
+		
 		String inp = Serial.readStringUntil('\n');
 		if (inp != "")
 		{

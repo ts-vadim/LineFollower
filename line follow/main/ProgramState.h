@@ -13,7 +13,7 @@ public:
 	static const char* StateNames[StatesCount];
 
 	static State GetState() { return m_State; }
-	static void SetState(State state) { m_State = state; Log::Println(String("State: ") + StateNames[m_State]); }
+	static void SetState(State state);
 
 private:
 	static State m_State;
