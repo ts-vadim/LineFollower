@@ -67,13 +67,22 @@ static Command userCommands[] = {
 	Command("halt", "stops program and waits for user input", [](Command&) { while (!ReadUserInput(nullptr, 0)); }),
 	Command("reset", "resets arduino", [](Command&) { void (*reset)(void) = 0; reset(); }),
 	Command("battery", "prints battery charge", [](Command&) { Log::Print("Battery charge: "); Log::Print(String(GetBatteryCharge() * 100)); Log::Println("%"); }),
+	Command("setsens", "(empty)", [](Command&)
+		{
+			char cmd[4];
+			Log::Println("Enter num");
+			while (!ReadUserInput(cmd, 4));
+			int num = String(cmd).toInt();
+			octoliner.setSensitivity(num);
+			Log::Println("Sensitivity: " + String(num));
+		}),
 	Command("", nullptr)
 };
 
 static Command programCommands[] = {
 	Command(ProgramState::StateNames[0], "stopped", stopped),
 	Command(ProgramState::StateNames[1], "waiting", waiting),
-	Command(ProgramState::StateNames[2], "running", running),
+	Command(ProgramState::StateNames[2], "running", running2),
 	Command("", nullptr)
 };
 
@@ -84,7 +93,7 @@ static Command programCommands[] = {
 void setup()
 {
 	robot.begin();
-	octoliner.begin(200);
+	octoliner.begin(120);
 	matrix.begin();
 
 	Log::Begin();
@@ -101,11 +110,25 @@ void setup()
 	}
 }
 
-void loop() {}
+void loop()
+{
+}
 
 
 //	###########  Function's Implementations  ###########
-void stopped(Command&) {}
+void stopped(Command&)
+{
+	static byte diagram[8] = {0};
+	static int lineData[8] = {0};
+
+	for (int i = 0; i < 8; i++) {
+		lineData[i] = octoliner.analogRead(i);
+		diagram[i] = matrix.map(lineData[i], 0, 4095);
+	}
+
+	matrix.drawBitmap(diagram);
+	matrix.update();
+}
 
 void waiting(Command&)
 {
@@ -118,55 +141,53 @@ void waiting(Command&)
 	if ((current - prev) / 1000.0 >= cooldown)
 	{
 		prev = current;
-		digitalWrite(2, ledState);
+		digitalWrite(13, ledState);
 		ledState = !ledState;
 	}
 }
 
 void running(Command&)
 {
-	static byte diagram[8] = {0};
 	static int lineData[8] = {0};
 	static int threshold = 2000;
 	static float error = 0;
 
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < 8; i++)
 		lineData[i] = octoliner.analogRead(i);
-		diagram[i] = matrix.map(lineData[i], 0, 4095);
-	}
 
 	error = octoliner.mapLine(lineData);
 	double output = pid.compute(error);
 	robot.driveF(dragsterSpeed - output, dragsterSpeed + output);
 
-	matrix.drawBitmap(diagram);
+	matrix.clear();
+	for (float i = 0; i < dragsterSpeed - output; i += 1.0 / 8.0)
+		matrix.drawPixel(8 - i * 8.0, 0);
+	for (float i = 0; i < dragsterSpeed + output; i += 1.0 / 8.0)
+		matrix.drawPixel(8 - i * 8.0, 7);
 	matrix.update();
 }
 
 
 void running2(Command&)
 {
-	static float error = 0;
-	static float sum = 0;
-	static float sumWeighted = 0;
-	static float Kp = 0.5;
-	static byte diagram[8] = {0};
-	static float weight[] =
-		{ -1, -0.75, -0.5, -0.25, 0.25, 0.5, 0.75, 1};
+	static float leftMotor = 0;
+	static float rightMotor = 0;
+	static int lineData[8] = {0};
 
+	for (int i = 0; i < 8; i++)
+		lineData[i] = octoliner.analogRead(i);
 
-	for (int i = 0; i < 8; i++) {
-		int adcValue = octoliner.analogRead(i);
-		diagram[i] = matrix.map(adcValue, 0, 4095);
-		sum += adcValue;
-		sumWeighted += adcValue * weight[i];
-		}
-	if (sum != 0.0) {
-		error = sumWeighted / sum;
-	}
-	matrix.drawBitmap(diagram);
+	leftMotor = lineData[0] / 4096.0;
+	rightMotor = lineData[7] / 4096.0;
 
-	robot.driveF(0.35 - error * Kp, 0.35 + error * Kp);
+	robot.driveF(leftMotor, rightMotor);
+
+	matrix.clear();
+	for (float i = 0; i < leftMotor; i += 1.0 / 8.0)
+		matrix.drawPixel(9 - i * 8.0, 0);
+	for (float i = 0; i < rightMotor; i += 1.0 / 8.0)
+		matrix.drawPixel(9 - i * 8.0, 7);
+	matrix.update();
 }
 
 

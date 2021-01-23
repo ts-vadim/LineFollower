@@ -42,4 +42,5 @@ void Log::WriteSerial(String msg, bool newline = true)
 		Serial.println(msg);
 	else
 		Serial.print(msg);
+	//Serial.flush();
 }
