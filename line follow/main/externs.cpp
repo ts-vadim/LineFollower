@@ -74,3 +74,13 @@ Command* FindCommand(const char* name, Command* commands)
 			return cmd;
 	return nullptr;
 }
+
+
+void FindTryExec(const char* cmdName, Command* commands)
+{
+	Command* cmd = FindCommand(cmdName, commands);
+	if (cmd)
+		cmd->Execute();
+	else
+		Log::Println("FindExec(): Can\'t find command \"" + String(cmdName) + "\"");
+}

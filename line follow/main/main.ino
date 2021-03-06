@@ -11,6 +11,7 @@ typedef TroykaLedMatrix Matrix;
 #include "ProgramState.h"
 #include "Command.h"
 #include "DragsterUtils.h"
+#include "graphics.h"
 
 
 //  ###########  Globals  ###########
@@ -40,6 +41,7 @@ extern void ProcessUserCommand(const char* cmd, Command* cmds);
 extern bool ReadUserInput(char* cmd, int cmdlen);
 extern void UpdateStateCommands(const char* stateName, Command* cmds);
 extern Command* FindCommand(const char* name, Command* commands);
+extern void FindTryExec(const char* name, Command* commands);
 
 
 //	###########  Commands  ###########
@@ -66,8 +68,16 @@ static Command userCommands[] = {
 	),
 	Command("halt", "stops program and waits for user input", [](Command&) { while (!ReadUserInput(nullptr, 0)); }),
 	Command("reset", "resets arduino", [](Command&) { void (*reset)(void) = 0; reset(); }),
-	Command("battery", "prints battery charge", [](Command&) { Log::Print("Battery charge: "); Log::Print(String(GetBatteryCharge() * 100)); Log::Println("%"); }),
-	Command("setsens", "(empty)", [](Command&)
+	Command("battery", "prints battery charge", [](Command&)
+		{
+			Log::Print("Battery charge: ");
+			Log::Print(String(GetBatteryCharge() * 100));
+			Log::Print("%");
+			Log::Print(" V: ");
+			Log::Println(String(GetBatteryVoltage()));
+		}
+	),
+	Command("sens", "(empty)", [](Command&)
 		{
 			char cmd[4];
 			Log::Println("Enter num");
@@ -82,7 +92,7 @@ static Command userCommands[] = {
 static Command programCommands[] = {
 	Command(ProgramState::StateNames[0], "stopped", stopped),
 	Command(ProgramState::StateNames[1], "waiting", waiting),
-	Command(ProgramState::StateNames[2], "running", running2),
+	Command(ProgramState::StateNames[2], "running", running),
 	Command("", nullptr)
 };
 
@@ -92,14 +102,15 @@ static Command programCommands[] = {
 //	##############################################################
 void setup()
 {
-	robot.begin();
-	octoliner.begin(120);
+	robot.begin(SWAP_BOTH);
+	octoliner.begin(240);
 	matrix.begin();
-
+	
+	// --- X
+	// |
+	// Y
+	matrix.setRotation(ROTATION_270);
 	Log::Begin();
-	Log::Println("Program begins");
-
-	FindCommand("help", userCommands)->Execute();
 
 	char userCmd[11];
 	while (true)
@@ -118,22 +129,16 @@ void loop()
 //	###########  Function's Implementations  ###########
 void stopped(Command&)
 {
-	static byte diagram[8] = {0};
-	static int lineData[8] = {0};
-
-	for (int i = 0; i < 8; i++) {
-		lineData[i] = octoliner.analogRead(i);
-		diagram[i] = matrix.map(lineData[i], 0, 4095);
-	}
-
-	matrix.drawBitmap(diagram);
+	DrawOctolinerData(matrix, octoliner);
 	matrix.update();
+
+	robot.driveF(0, 0);
 }
 
 void waiting(Command&)
 {
 	static bool ledState = false;
-	static const float cooldown = 0.1;
+	static const float cooldown = 0.3;
 	static int prev = 0;
 
 	int current = millis();
@@ -142,52 +147,30 @@ void waiting(Command&)
 	{
 		prev = current;
 		digitalWrite(13, ledState);
+
+		float charge = GetBatteryCharge() * 100.0;
+		if (ledState)
+			if (charge < 10)
+				matrix.clear();
+			else
+				DrawBatteryChargeScreen(matrix, charge);
+		else
+			DrawBatteryChargeScreen(matrix, 0);
+
 		ledState = !ledState;
 	}
+
+	robot.driveF(0, 0);
+	matrix.update();
 }
 
 void running(Command&)
 {
-	static int lineData[8] = {0};
-	static int threshold = 2000;
-	static float error = 0;
-
-	for (int i = 0; i < 8; i++)
-		lineData[i] = octoliner.analogRead(i);
-
-	error = octoliner.mapLine(lineData);
-	double output = pid.compute(error);
-	robot.driveF(dragsterSpeed - output, dragsterSpeed + output);
-
-	matrix.clear();
-	for (float i = 0; i < dragsterSpeed - output; i += 1.0 / 8.0)
-		matrix.drawPixel(8 - i * 8.0, 0);
-	for (float i = 0; i < dragsterSpeed + output; i += 1.0 / 8.0)
-		matrix.drawPixel(8 - i * 8.0, 7);
+	DrawOctolinerData(matrix, octoliner);
 	matrix.update();
-}
 
-
-void running2(Command&)
-{
-	static float leftMotor = 0;
-	static float rightMotor = 0;
-	static int lineData[8] = {0};
-
-	for (int i = 0; i < 8; i++)
-		lineData[i] = octoliner.analogRead(i);
-
-	leftMotor = lineData[0] / 4096.0;
-	rightMotor = lineData[7] / 4096.0;
-
-	robot.driveF(leftMotor, rightMotor);
-
-	matrix.clear();
-	for (float i = 0; i < leftMotor; i += 1.0 / 8.0)
-		matrix.drawPixel(9 - i * 8.0, 0);
-	for (float i = 0; i < rightMotor; i += 1.0 / 8.0)
-		matrix.drawPixel(9 - i * 8.0, 7);
-	matrix.update();
+	bool right = octoliner.analogRead(4) / 4096.0 > 0.5;
+	robot.driveF((right) ? 0.01 : 0.1, (right) ? 0.1 : 0.01);
 }
 
 
