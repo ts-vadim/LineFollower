@@ -16,9 +16,11 @@ typedef TroykaLedMatrix Matrix;
 
 //  ###########  Globals  ###########
 float dragsterSpeed = 0.7;
-float KP = 0.6;
+float KP = 0.3;
 float KD = 0.02;
 float KI = 0.0;
+
+float drive_proportions[] = { -0.65, -0.6, -0.55, -0.5, 0.5, 0.55, 0.6, 0.65 };
 
 TroykaLedMatrix matrix;
 Dragster robot;
@@ -86,6 +88,16 @@ static Command userCommands[] = {
 			octoliner.setSensitivity(num);
 			Log::Println("Sensitivity: " + String(num));
 		}),
+	Command("kp", "sets the KP", [](Command&)
+		{
+			char cmd[10];
+			Log::Println("Enter float");
+			while (!ReadUserInput(cmd, 10));
+			float num = String(cmd).toFloat();
+			KP = num;
+			Log::Println("KP: " + String(KP));
+		}
+	),
 	Command("", nullptr)
 };
 
@@ -103,14 +115,17 @@ static Command programCommands[] = {
 void setup()
 {
 	robot.begin(SWAP_BOTH);
+	robot.setMotorLimits(255, 0, 0);
 	octoliner.begin(240);
 	matrix.begin();
-	
+
 	// --- X
 	// |
 	// Y
 	matrix.setRotation(ROTATION_270);
 	Log::Begin();
+
+	FindTryExec("run", userCommands);
 
 	char userCmd[11];
 	while (true)
@@ -169,8 +184,34 @@ void running(Command&)
 	DrawOctolinerData(matrix, octoliner);
 	matrix.update();
 
-	bool right = octoliner.analogRead(4) / 4096.0 > 0.5;
-	robot.driveF((right) ? 0.01 : 0.1, (right) ? 0.1 : 0.01);
+	// Average
+	float final_proportion = 0.5;
+	int values_count = 0;
+	for (int i = 0; i < 8; i++)
+	{
+		float sensor_value = 1.0 - octoliner.analogRead(i) / 4096.0;
+
+		if (sensor_value < 0.5)
+		{
+			if (values_count == 0)
+				final_proportion = drive_proportions[i];
+			else
+				final_proportion += drive_proportions[i];
+			values_count++;
+		}
+	}
+
+	if (values_count > 0)
+		final_proportion /= values_count;
+
+	float left = (final_proportion < 0.0) ? abs(final_proportion) : (final_proportion > 0) ? (1.0 - final_proportion) : 0.5;
+	float right = (final_proportion < 0.0) ? 1.0 + final_proportion : (final_proportion > 0.0) ? (final_proportion) : 0.5;
+	left *= KP;
+	right *= KP;
+	robot.driveF(left, right);
+
+	Log::Println("P: " + String(final_proportion) + " Count: " + String(values_count));
+	Log::Println("L: " + String(left) + " R: " + String(right));
 }
 
 
